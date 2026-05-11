@@ -95,20 +95,20 @@ resource "aws_db_instance" "this" {
   vpc_security_group_ids = [aws_security_group.rds.id]
   parameter_group_name   = aws_db_parameter_group.this.name
 
-  publicly_accessible    = false
-  multi_az               = var.multi_az
-  deletion_protection    = true
-  skip_final_snapshot    = false
+  publicly_accessible       = false
+  multi_az                  = var.multi_az
+  deletion_protection       = true
+  skip_final_snapshot       = false
   final_snapshot_identifier = "${var.identifier}-final-snapshot"
 
   backup_retention_period = var.backup_retention_period
   backup_window           = "03:00-04:00"
   maintenance_window      = "sun:04:00-sun:05:00"
 
-  enabled_cloudwatch_logs_exports  = ["postgresql", "upgrade"]
-  performance_insights_enabled     = true
-  performance_insights_kms_key_id  = aws_kms_key.rds.arn
-  auto_minor_version_upgrade       = true
+  enabled_cloudwatch_logs_exports = ["postgresql", "upgrade"]
+  performance_insights_enabled    = true
+  performance_insights_kms_key_id = aws_kms_key.rds.arn
+  auto_minor_version_upgrade      = true
 
   tags = local.merged_tags
 }

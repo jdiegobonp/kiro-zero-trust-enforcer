@@ -15,8 +15,8 @@ locals {
   }
   merged_tags = merge(local.default_tags, var.tags)
 
-  action_count    = sum([for s in var.policy_statements : length(s.actions)])
-  resource_count  = sum([for s in var.policy_statements : length(s.resources)])
+  action_count        = sum([for s in var.policy_statements : length(s.actions)])
+  resource_count      = sum([for s in var.policy_statements : length(s.resources)])
   permissions_summary = "Actions: ${local.action_count} | Resources: ${local.resource_count}"
 }
 
