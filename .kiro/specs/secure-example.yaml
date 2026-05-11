@@ -1,0 +1,61 @@
+name: secure-payment-api
+version: "1.0"
+description: "Secure payment API — complies with zero-trust policies"
+
+resources:
+  - type: aws_iam_role
+    id: payment-lambda-role
+    config:
+      role_name: payment-lambda-exec
+      statements:
+        - effect: Allow
+          actions:
+            - s3:GetObject
+            - s3:PutObject
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          resources:
+            - "arn:aws:s3:::payment-data-bucket-REPLACE_WITH_YOUR_ACCOUNT_ID/*"
+            - "arn:aws:logs:us-east-1:REPLACE_WITH_YOUR_ACCOUNT_ID:log-group:/aws/lambda/payment-*"
+
+  - type: aws_db_instance
+    id: payment-database
+    config:
+      engine: postgres
+      publicly_accessible: false
+      storage_encrypted: true
+      backup_retention_period: 7
+      multi_az: true
+      deletion_protection: true
+
+  - type: aws_s3_bucket
+    id: payment-data-bucket
+    config:
+      acl: private
+      versioning: true
+      server_side_encryption: aws:kms
+
+  - type: aws_security_group
+    id: payment-lambda-sg
+    config:
+      description: "Lambda function security group — outbound only"
+      ingress: []
+      egress:
+        - cidr: "0.0.0.0/0"
+          port: 443
+
+  - type: aws_security_group
+    id: payment-rds-sg
+    config:
+      description: "RDS access — Lambda SG only"
+      ingress:
+        - source_sg: payment-lambda-sg
+          port: 5432
+      egress: []
+
+  - type: aws_vpc_endpoint
+    id: s3-endpoint
+    config:
+      service_name: com.amazonaws.us-east-1.s3
+      vpc_endpoint_type: Gateway

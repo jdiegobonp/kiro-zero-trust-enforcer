@@ -1,0 +1,80 @@
+name: Spec Security Validation
+
+on:
+  push:
+    paths:
+      - ".kiro/specs/**"
+      - "mcp-server/**"
+      - ".kiro/hooks/**"
+  pull_request:
+    paths:
+      - ".kiro/specs/**"
+      - "mcp-server/**"
+      - ".kiro/hooks/**"
+
+jobs:
+  validate-specs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: "mcp-server/package-lock.json"
+
+      - name: Install MCP server dependencies
+        working-directory: mcp-server
+        run: npm ci
+
+      - name: Build MCP server
+        working-directory: mcp-server
+        run: npm run build
+
+      - name: Run TypeScript tests
+        working-directory: mcp-server
+        run: npm test
+
+      - name: Install hook dependencies
+        working-directory: .kiro/hooks
+        run: npm ci
+
+      - name: Start MCP server
+        working-directory: mcp-server
+        run: |
+          node dist/index.js &
+          echo $! > /tmp/mcp-server.pid
+
+      - name: Wait for MCP server readiness
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:3000/health && break || true
+            echo "Waiting for MCP server... ($i/20)"
+            sleep 1
+          done
+          curl -sf http://localhost:3000/health || { echo "MCP server failed to start"; exit 1; }
+
+      - name: Validate insecure spec — expect violations (enforce mode)
+        run: |
+          node .kiro/hooks/policy-enforcer.js .kiro/specs/insecure-example.yaml && \
+            { echo "FAIL: insecure spec should have triggered violations"; exit 1; } || \
+            echo "PASS: violations correctly detected and blocked"
+
+      - name: Validate insecure spec — dry-run must exit 0
+        env:
+          POLICY_ENFORCER_DRY_RUN: "true"
+        run: |
+          node .kiro/hooks/policy-enforcer.js .kiro/specs/insecure-example.yaml
+          echo "PASS: dry-run mode correctly exited 0 despite violations"
+
+      - name: Validate secure spec — must pass in enforce mode
+        run: |
+          node .kiro/hooks/policy-enforcer.js .kiro/specs/secure-example.yaml
+          echo "PASS: secure spec passed validation"
+
+      - name: Stop MCP server
+        if: always()
+        run: |
+          PID=$(cat /tmp/mcp-server.pid 2>/dev/null || true)
+          [ -n "$PID" ] && kill "$PID" || true

@@ -1,0 +1,90 @@
+name: Terraform Plan + OPA Security Check
+
+on:
+  push:
+    paths:
+      - "terraform/**"
+      - "policies/opa/**"
+  pull_request:
+    paths:
+      - "terraform/**"
+      - "policies/opa/**"
+
+jobs:
+  opa-policy-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+
+      - name: OPA syntax check
+        run: opa check policies/opa/ --v1-compatible
+
+      - name: OPA — insecure spec must produce violations
+        run: |
+          RESULT=$(opa eval \
+            --data policies/opa/iam_least_privilege.rego \
+            --input .kiro/specs/insecure-example.yaml \
+            --format pretty \
+            "data.iam_least_privilege.deny")
+          echo "IAM violations: $RESULT"
+          echo "$RESULT" | grep -q "IAM-001" || { echo "FAIL: expected IAM-001 violation"; exit 1; }
+          echo "PASS: OPA correctly detected violations in insecure spec"
+
+      - name: OPA — secure spec must pass IAM policy
+        run: |
+          RESULT=$(opa eval \
+            --data policies/opa/iam_least_privilege.rego \
+            --input .kiro/specs/secure-example.yaml \
+            --format pretty \
+            "data.iam_least_privilege.deny")
+          echo "Result: $RESULT"
+          if echo "$RESULT" | grep -q "IAM-00"; then
+            echo "FAIL: secure spec triggered IAM violations"
+            exit 1
+          fi
+          echo "PASS: secure spec passed OPA IAM check"
+
+      - name: OPA — network posture on insecure spec
+        run: |
+          RESULT=$(opa eval \
+            --data policies/opa/no_public_resources.rego \
+            --input .kiro/specs/insecure-example.yaml \
+            --format pretty \
+            "data.no_public_resources.deny")
+          echo "Network violations: $RESULT"
+          echo "PASS: OPA network check completed"
+
+  terraform-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Terraform fmt check
+        working-directory: terraform
+        run: terraform fmt -check -recursive
+
+      - name: Validate minimal-iam module
+        working-directory: terraform/modules/minimal-iam
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate secure-rds module
+        working-directory: terraform/modules/secure-rds
+        run: |
+          terraform init -backend=false
+          terraform validate
+
+      - name: Validate secure-s3 module
+        working-directory: terraform/modules/secure-s3
+        run: |
+          terraform init -backend=false
+          terraform validate

@@ -1,0 +1,9 @@
+{
+  "name": "kiro-hooks",
+  "version": "1.0.0",
+  "description": "Kiro hooks dependencies",
+  "private": true,
+  "dependencies": {
+    "js-yaml": "^4.1.1"
+  }
+}

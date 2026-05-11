@@ -1,0 +1,41 @@
+name: insecure-payment-api
+version: "1.0"
+description: "Insecure payment API — intentionally violates zero-trust policies for demo"
+
+resources:
+  - type: aws_iam_role
+    id: payment-lambda-role
+    config:
+      role_name: payment-lambda-execution-role
+      statements:
+        - effect: Allow
+          actions:
+            - "*"
+          resources:
+            - "*"
+
+  - type: aws_db_instance
+    id: payment-database
+    config:
+      engine: postgres
+      publicly_accessible: true
+      storage_encrypted: false
+      backup_retention_period: 1
+      multi_az: false
+
+  - type: aws_s3_bucket
+    id: payment-data-bucket
+    config:
+      acl: public-read
+      versioning: false
+
+  - type: aws_security_group
+    id: payment-sg
+    config:
+      ingress:
+        - cidr: "0.0.0.0/0"
+          port: 22
+        - cidr: "0.0.0.0/0"
+          port: 5432
+        - cidr: "0.0.0.0/0"
+          port: 80

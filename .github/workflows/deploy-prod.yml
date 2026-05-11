@@ -1,0 +1,105 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Reason for manual deployment"
+        required: true
+        type: string
+
+jobs:
+  gate:
+    name: Security Gate Check
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check spec-validation workflow status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "Checking spec-validation on branch: ${{ github.ref_name }}"
+          RESULT=$(gh run list \
+            --workflow=spec-validation.yml \
+            --branch "${{ github.ref_name }}" \
+            --limit 1 \
+            --json status,conclusion,headSha)
+          echo "Last spec-validation run: $RESULT"
+          CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "BLOCKED: spec-validation last run concluded '$CONCLUSION' (need 'success')"
+            exit 1
+          fi
+          echo "PASS: spec-validation is green"
+
+      - name: Check plan-security workflow status
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RESULT=$(gh run list \
+            --workflow=plan-security.yml \
+            --branch "${{ github.ref_name }}" \
+            --limit 1 \
+            --json status,conclusion)
+          echo "Last plan-security run: $RESULT"
+          CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
+          if [ "$CONCLUSION" != "success" ]; then
+            echo "BLOCKED: plan-security last run concluded '$CONCLUSION' (need 'success')"
+            exit 1
+          fi
+          echo "PASS: plan-security is green"
+
+  deploy:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    needs: [gate]
+    environment: production
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.5"
+
+      - name: Terraform init
+        working-directory: terraform
+        run: terraform init
+
+      - name: Terraform plan
+        working-directory: terraform
+        run: |
+          terraform plan -out=tfplan -var-file=environments/prod.tfvars
+
+      - name: Terraform apply
+        working-directory: terraform
+        run: terraform apply tfplan
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp:** $(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "failure" ]; then
+            echo "- **Status:** FAILED — review Terraform output above for rollback instructions" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Status:** SUCCESS" >> $GITHUB_STEP_SUMMARY
+          fi
