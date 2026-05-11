@@ -8,5 +8,3 @@ terraform {
     }
   }
 }
-
-# New Change
