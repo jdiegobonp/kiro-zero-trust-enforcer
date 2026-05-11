@@ -2,13 +2,12 @@ name: Terraform Plan + OPA Security Check
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "terraform/**"
       - "policies/opa/**"
   pull_request:
-    paths:
-      - "terraform/**"
-      - "policies/opa/**"
 
 jobs:
   opa-policy-check:

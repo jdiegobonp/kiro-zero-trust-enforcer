@@ -2,15 +2,13 @@ name: Spec Security Validation
 
 on:
   push:
+    branches:
+      - main
     paths:
       - ".kiro/specs/**"
       - "mcp-server/**"
       - ".kiro/hooks/**"
   pull_request:
-    paths:
-      - ".kiro/specs/**"
-      - "mcp-server/**"
-      - ".kiro/hooks/**"
   workflow_dispatch:
 
 jobs:
