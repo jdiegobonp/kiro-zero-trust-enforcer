@@ -25,7 +25,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "Checking spec-validation on branch: ${{ github.ref_name }}"
+          echo "Checking spec-validation on branch: ${{ github.ref_name }} @ ${{ github.sha }}"
           RESULT=$(gh run list \
             --workflow=spec-validation.yml \
             --branch "${{ github.ref_name }}" \
@@ -33,11 +33,16 @@ jobs:
             --json status,conclusion,headSha)
           echo "Last spec-validation run: $RESULT"
           CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
+          HEAD_SHA=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['headSha'] if r else 'none')")
+          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
+            echo "BLOCKED: spec-validation last ran on $HEAD_SHA, not the current commit ${{ github.sha }}"
+            exit 1
+          fi
           if [ "$CONCLUSION" != "success" ]; then
             echo "BLOCKED: spec-validation last run concluded '$CONCLUSION' (need 'success')"
             exit 1
           fi
-          echo "PASS: spec-validation is green"
+          echo "PASS: spec-validation is green on ${{ github.sha }}"
 
       - name: Check plan-security workflow status
         env:
@@ -47,14 +52,19 @@ jobs:
             --workflow=plan-security.yml \
             --branch "${{ github.ref_name }}" \
             --limit 1 \
-            --json status,conclusion)
+            --json status,conclusion,headSha)
           echo "Last plan-security run: $RESULT"
           CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
+          HEAD_SHA=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['headSha'] if r else 'none')")
+          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
+            echo "BLOCKED: plan-security last ran on $HEAD_SHA, not the current commit ${{ github.sha }}"
+            exit 1
+          fi
           if [ "$CONCLUSION" != "success" ]; then
             echo "BLOCKED: plan-security last run concluded '$CONCLUSION' (need 'success')"
             exit 1
           fi
-          echo "PASS: plan-security is green"
+          echo "PASS: plan-security is green on ${{ github.sha }}"
 
   deploy:
     name: Deploy Infrastructure

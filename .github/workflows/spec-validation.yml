@@ -11,6 +11,7 @@ on:
       - ".kiro/specs/**"
       - "mcp-server/**"
       - ".kiro/hooks/**"
+  workflow_dispatch:
 
 jobs:
   validate-specs:
