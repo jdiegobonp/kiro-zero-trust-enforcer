@@ -29,42 +29,71 @@ jobs:
           RESULT=$(gh run list \
             --workflow=spec-validation.yml \
             --branch "${{ github.ref_name }}" \
-            --limit 1 \
-            --json status,conclusion,headSha)
-          echo "Last spec-validation run: $RESULT"
-          CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
-          HEAD_SHA=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['headSha'] if r else 'none')")
-          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
-            echo "BLOCKED: spec-validation last ran on $HEAD_SHA, not the current commit ${{ github.sha }}"
+            --limit 10 \
+            --json conclusion,headSha)
+          echo "spec-validation runs: $RESULT"
+          LAST_SUCCESS_SHA=$(echo "$RESULT" | python3 -c "
+          import sys, json
+          runs = json.load(sys.stdin)
+          for r in runs:
+              if r['conclusion'] == 'success':
+                  print(r['headSha']); break
+          else:
+              print('none')
+          ")
+          if [ "$LAST_SUCCESS_SHA" = "none" ]; then
+            echo "BLOCKED: no successful spec-validation run found on branch ${{ github.ref_name }}"
             exit 1
           fi
-          if [ "$CONCLUSION" != "success" ]; then
-            echo "BLOCKED: spec-validation last run concluded '$CONCLUSION' (need 'success')"
-            exit 1
+          if [ "$LAST_SUCCESS_SHA" = "${{ github.sha }}" ]; then
+            echo "PASS: spec-validation succeeded on current commit"
+          else
+            CHANGED=$(gh api \
+              "repos/${{ github.repository }}/compare/${LAST_SUCCESS_SHA}...${{ github.sha }}" \
+              --jq '[.files[].filename | select(startswith(".kiro/specs/") or startswith("mcp-server/") or startswith(".kiro/hooks/"))] | length')
+            if [ "$CHANGED" -gt 0 ]; then
+              echo "BLOCKED: $CHANGED spec-monitored file(s) changed since last successful run ($LAST_SUCCESS_SHA) — trigger spec-validation manually or push a spec/hook/mcp-server change"
+              exit 1
+            fi
+            echo "PASS: spec-validation succeeded on $LAST_SUCCESS_SHA; no spec-path changes since then"
           fi
-          echo "PASS: spec-validation is green on ${{ github.sha }}"
 
       - name: Check plan-security workflow status
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "Checking plan-security on branch: ${{ github.ref_name }} @ ${{ github.sha }}"
           RESULT=$(gh run list \
             --workflow=plan-security.yml \
             --branch "${{ github.ref_name }}" \
-            --limit 1 \
-            --json status,conclusion,headSha)
-          echo "Last plan-security run: $RESULT"
-          CONCLUSION=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['conclusion'] if r else 'none')")
-          HEAD_SHA=$(echo "$RESULT" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['headSha'] if r else 'none')")
-          if [ "$HEAD_SHA" != "${{ github.sha }}" ]; then
-            echo "BLOCKED: plan-security last ran on $HEAD_SHA, not the current commit ${{ github.sha }}"
+            --limit 10 \
+            --json conclusion,headSha)
+          echo "plan-security runs: $RESULT"
+          LAST_SUCCESS_SHA=$(echo "$RESULT" | python3 -c "
+          import sys, json
+          runs = json.load(sys.stdin)
+          for r in runs:
+              if r['conclusion'] == 'success':
+                  print(r['headSha']); break
+          else:
+              print('none')
+          ")
+          if [ "$LAST_SUCCESS_SHA" = "none" ]; then
+            echo "BLOCKED: no successful plan-security run found on branch ${{ github.ref_name }}"
             exit 1
           fi
-          if [ "$CONCLUSION" != "success" ]; then
-            echo "BLOCKED: plan-security last run concluded '$CONCLUSION' (need 'success')"
-            exit 1
+          if [ "$LAST_SUCCESS_SHA" = "${{ github.sha }}" ]; then
+            echo "PASS: plan-security succeeded on current commit"
+          else
+            CHANGED=$(gh api \
+              "repos/${{ github.repository }}/compare/${LAST_SUCCESS_SHA}...${{ github.sha }}" \
+              --jq '[.files[].filename | select(startswith("terraform/") or startswith("policies/opa/"))] | length')
+            if [ "$CHANGED" -gt 0 ]; then
+              echo "BLOCKED: $CHANGED terraform/OPA file(s) changed since last successful run ($LAST_SUCCESS_SHA) — wait for plan-security to complete"
+              exit 1
+            fi
+            echo "PASS: plan-security succeeded on $LAST_SUCCESS_SHA; no terraform/OPA changes since then"
           fi
-          echo "PASS: plan-security is green on ${{ github.sha }}"
 
   deploy:
     name: Deploy Infrastructure
