@@ -114,6 +114,40 @@ All GitHub Actions workflows use OIDC to assume AWS roles — no access keys are
 
 ---
 
+## AWS MCP Server — Runtime Companion
+
+The local MCP server in this repo enforces zero-trust at **spec time** (before codegen). It does not — and should not — call AWS.
+
+The [AWS MCP Server](https://aws.amazon.com/blogs/aws/the-aws-mcp-server-is-now-generally-available/) (GA, 2026) is the runtime counterpart: an authenticated MCP endpoint that exposes `call_aws`, `run_script`, and AWS documentation search to any MCP client, using existing IAM credentials.
+
+This branch wires it in as an **additive** layer:
+
+- `.kiro/steering/aws-mcp.md` — tells Kiro when to delegate to AWS MCP vs. the local server
+- `.kiro/skills/aws-account-audit/SKILL.md` — read-only audit of the live account, findings shaped like local MCP violations (same `ruleId` namespace)
+- `docs/aws-mcp-integration.md` — design, setup, layered enforcement model (L-1..L3), open questions
+
+No changes to `mcp-server/src/`. The AWS MCP signal **augments** local enforcement; it never overrides a `CRITICAL` block.
+
+### SCP Layer (L-1)
+
+Service Control Policies sit **above** IAM at the AWS Organizations level — a `Deny` here cannot be bypassed by any role policy. Six SCPs mirror the project's CRITICAL rules and ship as a reusable Terraform module:
+
+- `terraform/modules/scp-zero-trust/` — module with `deny_public_s3`, `deny_rds_public`, `deny_unencrypted_rds`, `deny_open_dangerous_ports`, `require_mfa_for_admin`, `deny_outside_regions`
+- `policies/opa/scp_alignment.rego` — fails CI when a Terraform plan would be denied by an attached SCP (catches contradictions before `apply`)
+- `.kiro/steering/aws-scp.md` — rollout protocol, what SCPs cover vs. don't
+- `aws-account-audit` skill, scope `scp` — drift detection: local JSON vs. live SCPs via AWS MCP
+
+Apply from the AWS Organizations management account only, and stage the rollout sandbox → non-prod → prod → root.
+
+Install:
+
+```bash
+claude mcp add-json aws-mcp --scope user \
+  '{"command":"uvx","args":["mcp-proxy-for-aws@latest","https://aws-mcp.us-east-1.api.aws/mcp"]}'
+```
+
+---
+
 ## Demo Scenarios
 
 See [docs/demo-script.md](docs/demo-script.md) for a complete 10-minute live demo script including backup plans.

@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyAuthorizeSGIngressFromAnywhereOnDangerousPorts",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:UpdateSecurityGroupRuleDescriptionsIngress"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:Source": "0.0.0.0/0"
+        },
+        "NumericEquals": {
+          "ec2:FromPort": [
+            "22",
+            "23",
+            "1433",
+            "3306",
+            "5432",
+            "6379",
+            "9200",
+            "9300",
+            "27017"
+          ]
+        }
+      }
+    }
+  ]
+}
