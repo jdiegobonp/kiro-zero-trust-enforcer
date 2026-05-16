@@ -89,7 +89,7 @@ The hook in `.kiro/hooks/policy-enforcer.js` fires after every spec save in Kiro
 
 The TypeScript server in `mcp-server/` runs on port 3000 and exposes:
 
-- **MCP Streamable HTTP** at `/mcp` — for Kiro and Claude Desktop integration
+- **MCP Streamable HTTP** at `/mcp` — for Kiro IDE integration
 - **REST API** at `/tools/*` — for direct testing and the hook
 - **Health check** at `/health` — used by GitHub Actions readiness probes
 
@@ -139,12 +139,23 @@ Service Control Policies sit **above** IAM at the AWS Organizations level — a 
 
 Apply from the AWS Organizations management account only, and stage the rollout sandbox → non-prod → prod → root.
 
-Install:
+Install (Kiro only). Register the server in Kiro's MCP config — `.kiro/settings/mcp.json` for the workspace or `~/.kiro/settings/mcp.json` for the user. Create the file if it does not exist:
 
-```bash
-claude mcp add-json aws-mcp --scope user \
-  '{"command":"uvx","args":["mcp-proxy-for-aws@latest","https://aws-mcp.us-east-1.api.aws/mcp"]}'
+```json
+{
+  "mcpServers": {
+    "aws-mcp": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws@latest",
+        "https://aws-mcp.us-east-1.api.aws/mcp"
+      ]
+    }
+  }
+}
 ```
+
+Reload the Kiro window after saving. The `claude mcp add-json` CLI belongs to Claude Code and does **not** apply here.
 
 ---
 

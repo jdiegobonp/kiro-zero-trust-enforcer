@@ -17,10 +17,13 @@ spec has passed local enforcement, to confirm the deployed account actually matc
 
 ## Prerequisites
 
-- AWS MCP Server registered: `claude mcp list` shows `aws-mcp`.
+- AWS MCP Server registered in Kiro: an `aws-mcp` entry exists in `.kiro/settings/mcp.json`
+  (workspace) or `~/.kiro/settings/mcp.json` (user), and Kiro lists it as an available MCP server.
 - Active AWS credentials with read-only audit permissions (`ec2:Describe*`, `rds:Describe*`,
   `s3:GetBucket*`, `iam:Get*`, `iam:List*`, `iam:Simulate*`).
-- If missing: tell the user to run the install command from `docs/aws-mcp-integration.md` and stop.
+- If missing: tell the user to follow the Kiro install block in `docs/aws-mcp-integration.md`
+  (edit `.kiro/settings/mcp.json` and reload the Kiro window) and stop. Do not suggest
+  `claude mcp add-json` — that is Claude Code, not Kiro.
 
 ## Arguments
 
@@ -32,8 +35,8 @@ spec has passed local enforcement, to confirm the deployed account actually matc
 
 ### Step 1 — Confirm AWS MCP availability
 
-Ask Kiro to use the `aws-mcp` server. If the user's session has no `aws-mcp` registered, halt and print
-the install command from `docs/aws-mcp-integration.md`.
+Ask Kiro to use the `aws-mcp` server. If the user's Kiro session has no `aws-mcp` registered in
+`.kiro/settings/mcp.json`, halt and print the Kiro install block from `docs/aws-mcp-integration.md`.
 
 ### Step 2 — Run the scoped audit
 

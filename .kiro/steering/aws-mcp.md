@@ -16,12 +16,23 @@ Use both. They are layered, not redundant.
 - **Auth:** existing IAM credentials (AWS CLI profile, env vars, or SSO). No new keys.
 - **Pricing:** server is free; pay only for AWS resources created or queried.
 
-Install for Kiro / Claude Code:
+Install for Kiro. This project targets Kiro IDE only. Add the server to Kiro's MCP config — `.kiro/settings/mcp.json` for the workspace or `~/.kiro/settings/mcp.json` for the user. Create the file if it does not exist:
 
-```bash
-claude mcp add-json aws-mcp --scope user \
-  '{"command":"uvx","args":["mcp-proxy-for-aws@latest","https://aws-mcp.us-east-1.api.aws/mcp"]}'
+```json
+{
+  "mcpServers": {
+    "aws-mcp": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws@latest",
+        "https://aws-mcp.us-east-1.api.aws/mcp"
+      ]
+    }
+  }
+}
 ```
+
+Reload the Kiro window after saving. `claude mcp add-json` is Claude Code CLI syntax and **does not apply** here.
 
 ## When to Call Which Server
 
