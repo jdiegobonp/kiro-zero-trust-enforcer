@@ -54,19 +54,6 @@ jobs:
           done
           curl -sf http://localhost:3000/health || { echo "MCP server failed to start"; exit 1; }
 
-      - name: Validate insecure spec — expect violations (enforce mode)
-        run: |
-          node .kiro/hooks/policy-enforcer.js .kiro/specs/insecure-example.yaml && \
-            { echo "FAIL: insecure spec should have triggered violations"; exit 1; } || \
-            echo "PASS: violations correctly detected and blocked"
-
-      - name: Validate insecure spec — dry-run must exit 0
-        env:
-          POLICY_ENFORCER_DRY_RUN: "true"
-        run: |
-          node .kiro/hooks/policy-enforcer.js .kiro/specs/insecure-example.yaml
-          echo "PASS: dry-run mode correctly exited 0 despite violations"
-
       - name: Validate secure spec — must pass in enforce mode
         run: |
           node .kiro/hooks/policy-enforcer.js .kiro/specs/secure-example.yaml

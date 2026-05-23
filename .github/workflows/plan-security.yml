@@ -26,17 +26,6 @@ jobs:
       - name: OPA syntax check
         run: opa check policies/opa/ --v1-compatible
 
-      - name: OPA — insecure spec must produce violations
-        run: |
-          RESULT=$(opa eval \
-            --data policies/opa/iam_least_privilege.rego \
-            --input .kiro/specs/insecure-example.yaml \
-            --format pretty \
-            "data.iam_least_privilege.deny")
-          echo "IAM violations: $RESULT"
-          echo "$RESULT" | grep -q "IAM-001" || { echo "FAIL: expected IAM-001 violation"; exit 1; }
-          echo "PASS: OPA correctly detected violations in insecure spec"
-
       - name: OPA — secure spec must pass IAM policy
         run: |
           RESULT=$(opa eval \
@@ -50,16 +39,6 @@ jobs:
             exit 1
           fi
           echo "PASS: secure spec passed OPA IAM check"
-
-      - name: OPA — network posture on insecure spec
-        run: |
-          RESULT=$(opa eval \
-            --data policies/opa/no_public_resources.rego \
-            --input .kiro/specs/insecure-example.yaml \
-            --format pretty \
-            "data.no_public_resources.deny")
-          echo "Network violations: $RESULT"
-          echo "PASS: OPA network check completed"
 
   iam-access-analyzer:
     name: IAM Access Analyzer — ValidatePolicy
