@@ -1,0 +1,52 @@
+name: lambda-sqs-processor
+version: "1.0"
+description: "Lambda function processing SQS messages with intentionally insecure IAM policy for blast radius demonstration"
+
+resources:
+  - type: aws_iam_role
+    id: lambda-execution-role
+    config:
+      role_name: sqs-processor-lambda-exec
+      assume_role_policy:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      statements:
+        - effect: Allow
+          actions:
+            - "*"
+          resources:
+            - "*"
+
+  - type: aws_sqs_queue
+    id: processing-queue
+    config:
+      queue_name: message-processing-queue
+      visibility_timeout_seconds: 300
+      message_retention_seconds: 345600
+      receive_wait_time_seconds: 0
+      max_message_size: 262144
+
+  - type: aws_lambda_function
+    id: sqs-processor
+    config:
+      function_name: sqs-message-processor
+      runtime: python3.11
+      handler: index.handler
+      role: lambda-execution-role
+      memory_size: 256
+      timeout: 60
+      environment:
+        variables:
+          QUEUE_URL: processing-queue
+
+  - type: aws_lambda_event_source_mapping
+    id: sqs-trigger
+    config:
+      event_source_arn: processing-queue
+      function_name: sqs-processor
+      batch_size: 10
+      enabled: true

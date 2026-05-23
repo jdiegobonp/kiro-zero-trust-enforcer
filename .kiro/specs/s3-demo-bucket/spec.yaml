@@ -1,0 +1,43 @@
+name: s3-demo-bucket
+version: "1.0"
+description: "Zero-trust compliant S3 bucket for demonstration purposes"
+
+resources:
+  - type: aws_s3_bucket
+    id: demo-bucket
+    config:
+      bucket_name: "ACCOUNT_ID-zero-trust-demo"
+      acl: private
+      versioning: true
+      server_side_encryption: aws:kms
+      public_access_block:
+        block_public_acls: true
+        block_public_policy: true
+        ignore_public_acls: true
+        restrict_public_buckets: true
+      bucket_policy:
+        statements:
+          - sid: DenyNonTLS
+            effect: Deny
+            principal: "*"
+            action: "s3:*"
+            condition:
+              Bool:
+                "aws:SecureTransport": "false"
+      lifecycle_rules:
+        - id: tiered-storage
+          status: Enabled
+          transitions:
+            - days: 30
+              storage_class: STANDARD_IA
+            - days: 90
+              storage_class: GLACIER
+          noncurrent_version_expiration:
+            days: 90
+      
+  - type: aws_kms_key
+    id: bucket-encryption-key
+    config:
+      description: "KMS key for S3 bucket encryption"
+      enable_key_rotation: true
+      deletion_window_in_days: 7

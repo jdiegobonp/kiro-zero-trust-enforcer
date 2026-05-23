@@ -12,6 +12,26 @@ This project enforces Zero Trust security policies on AWS architecture specs bef
 .kiro/specs/<name>.yaml  →  .kiro/hooks/policy-enforcer.js  →  MCP REST API  →  exit 0 / 1
 ```
 
+## Spec Creation Workflow (MANDATORY)
+
+Kiro always creates specs as a folder: `.kiro/specs/<name>/` with `design.md`, `requirements.md`, and `tasks.md` inside.
+
+Whenever you finish generating or updating any of those files, you MUST:
+
+1. **Create `spec.yaml` in the same folder** — extract the `ArchSpec` YAML block from `design.md` (look for a fenced yaml block under a heading like "Especificación de arquitectura" or "Architecture Spec") and write it to `.kiro/specs/<name>/spec.yaml`. If no block exists yet, generate a compliant one from the resources described in `design.md`.
+
+2. **Run the policy enforcer on the folder** — pass the folder path, not the yaml file:
+   ```bash
+   node .kiro/hooks/policy-enforcer.js .kiro/specs/<name>/
+   ```
+   Do NOT wait for the user to ask. Run immediately after saving `spec.yaml`.
+
+3. **Block on violations** — if exit code is 1 (CRITICAL/HIGH), do NOT generate Terraform. Show violations and offer remediation.
+
+4. **Proceed only on exit 0** — once the spec is clean, continue with code generation.
+
+The hook accepts both folder paths and direct yaml paths. Always use the folder path for new specs.
+
 ## MCP Server
 
 - **URL:** `http://localhost:3000`
