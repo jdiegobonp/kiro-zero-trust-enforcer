@@ -120,12 +120,12 @@ jobs:
           fi
           CHANGED=$(gh api \
             "repos/${{ github.repository }}/compare/${LAST_SUCCESS_SHA}...${{ github.sha }}" \
-            --jq '[.files[].filename | select(startswith("terraform/") or startswith("policies/opa/"))] | length')
+            --jq '[.files[].filename | select(startswith("terraform/") or startswith("policies/opa/") or startswith(".kiro/specs/"))] | length')
           if [ "$CHANGED" -gt 0 ]; then
-            echo "BLOCKED: $CHANGED terraform/OPA file(s) changed since last successful run ($LAST_SUCCESS_SHA) — wait for plan-security to complete"
+            echo "BLOCKED: $CHANGED terraform/OPA/spec file(s) changed since last successful run ($LAST_SUCCESS_SHA) — wait for plan-security to complete"
             exit 1
           fi
-          echo "PASS: plan-security succeeded on $LAST_SUCCESS_SHA; no terraform/OPA changes since then"
+          echo "PASS: plan-security succeeded on $LAST_SUCCESS_SHA; no terraform/OPA/spec changes since then"
 
   deploy:
     name: Deploy Infrastructure

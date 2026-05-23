@@ -16,8 +16,8 @@ resources:
             - logs:CreateLogStream
             - logs:PutLogEvents
           resources:
-            - "arn:aws:s3:::payment-data-bucket-REPLACE_WITH_YOUR_ACCOUNT_ID/*"
-            - "arn:aws:logs:us-east-1:REPLACE_WITH_YOUR_ACCOUNT_ID:log-group:/aws/lambda/payment-*"
+            - "arn:aws:s3:::payment-data-bucket-328830388071/*"
+            - "arn:aws:logs:us-east-1:328830388071:log-group:/aws/lambda/payment-*"
 
   - type: aws_db_instance
     id: payment-database
