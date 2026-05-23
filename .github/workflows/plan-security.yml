@@ -7,6 +7,7 @@ on:
     paths:
       - "terraform/**"
       - "policies/opa/**"
+      - ".kiro/specs/**"
   pull_request:
 
 jobs:
@@ -56,6 +57,79 @@ jobs:
             "data.no_public_resources.deny")
           echo "Network violations: $RESULT"
           echo "PASS: OPA network check completed"
+
+  iam-access-analyzer:
+    name: IAM Access Analyzer — ValidatePolicy
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_IAA_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Install PyYAML
+        run: pip install pyyaml --quiet
+
+      - name: Validate IAM policies with Access Analyzer
+        run: |
+          python3 - <<'EOF'
+          import boto3, yaml, json, sys, os, glob
+
+          client = boto3.client('accessanalyzer', region_name='us-east-1')
+
+          BLOCKING = {'ERROR', 'SECURITY_WARNING'}
+          SEVERITY = {'ERROR': 'CRITICAL', 'SECURITY_WARNING': 'HIGH', 'WARNING': 'MEDIUM', 'SUGGESTION': 'LOW'}
+
+          failed = False
+          spec_files = glob.glob('.kiro/specs/*.yaml')
+          print(f"Scanning {len(spec_files)} spec(s) with IAM Access Analyzer...")
+
+          for path in spec_files:
+              with open(path) as f:
+                  spec = yaml.safe_load(f)
+
+              for resource in spec.get('resources', []):
+                  if resource['type'] not in ('aws_iam_role', 'aws_iam_policy'):
+                      continue
+                  statements = resource.get('config', {}).get('statements', [])
+                  if not statements:
+                      continue
+
+                  policy_doc = json.dumps({
+                      'Version': '2012-10-17',
+                      'Statement': [
+                          {
+                              'Effect': s['effect'],
+                              'Action': s['actions'],
+                              'Resource': s['resources'],
+                              **(({'Condition': s['conditions']} if s.get('conditions') else {})),
+                          }
+                          for s in statements
+                      ],
+                  })
+
+                  response = client.validate_policy(
+                      policyDocument=policy_doc,
+                      policyType='IDENTITY_POLICY',
+                  )
+
+                  for f in response.get('findings', []):
+                      sev = SEVERITY.get(f['findingType'], 'MEDIUM')
+                      print(f"  [{sev}] {resource['id']} — {f['issueCode']}: {f['findingDetails']}")
+                      if f['findingType'] in BLOCKING:
+                          failed = True
+
+          if failed:
+              print('\nBLOCKED: IAM Access Analyzer found ERROR or SECURITY_WARNING violations')
+              sys.exit(1)
+          print('\nPASS: no blocking violations found by IAM Access Analyzer')
+          EOF
 
   terraform-validate:
     runs-on: ubuntu-latest

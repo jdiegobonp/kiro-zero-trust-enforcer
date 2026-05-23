@@ -13,19 +13,32 @@ Validate an architecture spec against the zero-trust policy rules via the MCP se
 
 ## Arguments
 
-- `<spec>` (optional) — path to a YAML spec file. If omitted, use the active editor file, or prompt
-  the user to choose from `.kiro/specs/`.
+- `<spec>` (optional) — path to a Kiro spec folder (`.kiro/specs/<name>/`) or a direct `.yaml` file. If omitted, lists available specs.
 - `--dry-run` (optional flag) — log violations but do not block; always exits 0.
 
 ## Steps
 
 ### Step 1 — Resolve the spec path
 
-1. If a path was provided as an argument, use it directly.
-2. Otherwise, check if the currently open file in the editor is a `.yaml` or `.yml` file under `.kiro/specs/` — if so, use it.
-3. Otherwise, list files in `.kiro/specs/` and ask the user to choose one.
+1. If a path was provided as an argument, use it directly (folder or yaml file).
+2. Otherwise, check if the currently active file in the editor lives under `.kiro/specs/` — if so, derive its spec folder and use that.
+3. Otherwise, list all spec folders:
 
-Verify the file exists before continuing.
+   ```bash
+   find .kiro/specs -mindepth 1 -maxdepth 1 -type d
+   ```
+
+   Also include any standalone `.yaml` files at the root of `.kiro/specs/`:
+
+   ```bash
+   find .kiro/specs -maxdepth 1 -name "*.yaml" -o -name "*.yml"
+   ```
+
+   Present the combined list by name and ask the user to choose.
+
+The hook accepts both folders and yaml files — pass whatever was resolved.
+
+Verify the path exists before continuing.
 
 ### Step 2 — Check the MCP server
 

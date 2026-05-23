@@ -2,7 +2,9 @@
 /**
  * Kiro post-spec hook: validates architecture spec against zero-trust policies.
  *
- * Usage: node policy-enforcer.js <path-to-spec.yaml>
+ * Usage:
+ *   node policy-enforcer.js <path-to-spec.yaml>       — single YAML file
+ *   node policy-enforcer.js <path-to-spec-folder/>    — Kiro spec folder (reads spec.yaml inside)
  *
  * Environment variables:
  *   POLICY_ENFORCER_DRY_RUN=true  — log violations but never exit 1
@@ -40,9 +42,30 @@ function formatViolation(v) {
   ].join('\n');
 }
 
+function resolveSpecPath(inputPath) {
+  const resolved = path.resolve(inputPath);
+  const stat = fs.statSync(resolved);
+  if (stat.isDirectory()) {
+    return path.join(resolved, 'spec.yaml');
+  }
+  return resolved;
+}
+
 async function main() {
   if (!specPath) {
-    warn('ERROR: No spec path provided. Usage: node policy-enforcer.js <spec.yaml>');
+    warn('ERROR: No spec path provided.');
+    warn('  Usage: node policy-enforcer.js <spec.yaml>');
+    warn('         node policy-enforcer.js <spec-folder/>');
+    exit(1);
+    return;
+  }
+
+  // Resolve folder → spec.yaml if needed
+  let resolvedPath;
+  try {
+    resolvedPath = resolveSpecPath(specPath);
+  } catch (err) {
+    warn(`ERROR: Path not found "${specPath}": ${err.message}`);
     exit(1);
     return;
   }
@@ -50,10 +73,10 @@ async function main() {
   // Read and parse spec YAML
   let spec;
   try {
-    const raw = fs.readFileSync(path.resolve(specPath), 'utf8');
+    const raw = fs.readFileSync(resolvedPath, 'utf8');
     spec = yaml.load(raw);
   } catch (err) {
-    warn(`ERROR: Failed to read spec at "${specPath}": ${err.message}`);
+    warn(`ERROR: Failed to read spec at "${resolvedPath}": ${err.message}`);
     if (DRY_RUN) {
       warn('[DRY-RUN] Would fail-closed in enforce mode. Continuing due to dry-run.');
       process.exit(0);
@@ -66,7 +89,8 @@ async function main() {
     log('DRY-RUN mode enabled — violations will be logged but will NOT block execution.');
   }
 
-  log(`Validating spec: ${path.basename(specPath)}`);
+  const specLabel = path.basename(path.dirname(resolvedPath)) + '/spec.yaml';
+  log(`Validating spec: ${specLabel}`);
 
   // Call both MCP REST endpoints in parallel
   let iamResult, networkResult;
