@@ -72,6 +72,20 @@ jobs:
           node .kiro/hooks/policy-enforcer.js .kiro/specs/secure-example.yaml
           echo "PASS: secure spec passed validation"
 
+      - name: Validate all spec.yaml files — must pass in enforce mode
+        run: |
+          failed=0
+          while IFS= read -r spec; do
+            echo "Validating $spec..."
+            if node .kiro/hooks/policy-enforcer.js "$spec"; then
+              echo "PASS: $spec"
+            else
+              echo "FAIL: $spec has policy violations"
+              failed=1
+            fi
+          done < <(find .kiro/specs -name "spec.yaml")
+          [ "$failed" -eq 0 ] || exit 1
+
       - name: Stop MCP server
         if: always()
         run: |
